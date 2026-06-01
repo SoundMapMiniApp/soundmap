@@ -457,7 +457,33 @@ function connectSocket(){
     if(pc) await pc.addIceCandidate(candidate);
   });
 
-  socket.on('webrtc:host_left', () => {
+  // YouTube синхронизация
+  socket.on('yt:position', ({ position, videoId }) => {
+    if(!ytPlayer){
+      playYT(videoId);
+      setTimeout(() => {
+        if(ytPlayer && ytPlayer.seekTo){
+          ytPlayer.seekTo(position, true);
+        }
+      }, 2000);
+    } else {
+      const current = ytPlayer.getCurrentTime();
+      if(Math.abs(current - position) > 3){
+        ytPlayer.seekTo(position, true);
+      }
+    }
+  });
+
+  socket.on('yt:sync', ({ videoId, position }) => {
+    playYT(videoId);
+    setTimeout(() => {
+      if(ytPlayer && ytPlayer.seekTo){
+        ytPlayer.seekTo(position, true);
+        ytPlayer.playVideo();
+      }
+    }, 2000);
+    showToast('▶️ Синхронизация YouTube!');
+  });socket.on('webrtc:host_left', () => {
     if(window.remoteAudio){
       window.remoteAudio.pause();
       window.remoteAudio = null;
