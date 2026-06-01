@@ -647,11 +647,15 @@ function extractYTid(url){
 function playYT(videoId, startPosition){
   ytVideoId = videoId;
   ytPosition = startPosition || 0;
-  var wrap = document.getElementById('yt-wrap');
-  var iframe = document.getElementById('yt-iframe');
-  wrap.style.display = 'block';
-  var src = 'https://www.youtube-nocookie.com/embed/' + videoId + '?autoplay=1&playsinline=1&start=' + Math.floor(ytPosition);
-  iframe.src = src;
+
+  // Открываем через встроенный браузер Telegram
+  var ytUrl = 'https://youtu.be/' + videoId + '?t=' + Math.floor(ytPosition);
+  
+  if(tg && tg.openLink){
+    tg.openLink(ytUrl);
+  } else {
+    window.open(ytUrl, '_blank');
+  }
 
   myTrack = myTrack || 'YouTube';
   myArtist = myArtist || 'YouTube';
@@ -662,14 +666,9 @@ function playYT(videoId, startPosition){
   updatePlayer();
   updateMeDot();
 
-  // Синхронизируем позицию
-  clearInterval(ytSyncInterval);
-  ytSyncInterval = setInterval(function(){
-    ytPosition += 3;
-    if(window.socket){
-      socket.emit('yt:position', { videoId: videoId, position: ytPosition });
-    }
-  }, 3000);
+  if(window.socket) socket.emit('track:set', { track: myTrack, artist: myArtist });
+
+  showToast('▶️ Открываем YouTube!');
 }
 
 function closeYT(){
