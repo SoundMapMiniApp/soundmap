@@ -311,10 +311,118 @@ function startApp(){
   document.getElementById('screen-splash').classList.add('hidden');
   document.getElementById('screen-app').classList.remove('hidden');
   document.getElementById('my-avatar').textContent='🎵';
-  renderDots();
   animateOnline();
-  if(navigator.geolocation)navigator.geolocation.watchPosition(p=>console.log('📍',p.coords.latitude,p.coords.longitude),e=>console.log(e),{enableHighAccuracy:true});
+
+  // Подключаемся к серверу
+  const script = document.createElement('script');
+  script.src = 'https://cdn.socket.io/4.6.1/socket.io.min.js';
+  script.onload = () => connectSocket();
+  document.head.appendChild(script);
+
+  // Запрашиваем геолокацию
+  if(navigator.geolocation){
+    navigator.geolocation.getCurrentPosition(pos => {
+      myLat = pos.coords.latitude;
+      myLng = pos.coords.longitude;
+      renderDots();
+    }, () => {
+      myLat = 55.751244;
+      myLng = 37.618423;
+      renderDots();
+    });
+  } else {
+    myLat = 55.751244;
+    myLng = 37.618423;
+    renderDots();
+  }
+
   showToast('Привет, '+MY_NAME+'! 👋');
+}
+
+function connectSocket(){
+  window.socket = io(SERVER_URL);
+
+  socket.on('connect', () => {
+    console.log('✅ Подключён к серверу');
+    socket.emit('user:join', {
+      name: MY_NAME,
+      emoji: '🎵',
+      lat: myLat,
+      lng: myLng,
+    });
+  });
+
+  // Получили всех онлайн пользователей
+  socket.on('users:all', (data) => {
+    data.forEach(u => {
+      if(u.id !== socket.id) addRealUser(u);
+    });
+  });
+
+  // Новый пользователь зашёл
+  socket.on('user:joined', (u) => {
+    addRealUser(u);
+    showToast('🎵 '+u.name+' появился на карте');
+  });
+
+  // Пользователь ушёл
+  socket.on('user:offline', (data) => {
+    const el = document.querySelector(`.user-dot[data-id="${data.id}"]`);
+    if(el) el.remove();
+  });
+
+  // Пользователь переместился
+  socket.on('user:moved', (data) => {
+    const el = document.querySelector(`.user-dot[data-id="${data.id}"]`);
+    if(el){
+      el.style.left = lngToX(data.lng) + '%';
+      el.style.top  = latToY(data.lat) + '%';
+    }
+  });
+
+  // Пользователь сменил трек
+  socket.on('user:track', (data) => {
+    const tn = document.querySelector(`.user-dot[data-id="${data.id}"] .dot-track-name`);
+    const ta = document.querySelector(`.user-dot[data-id="${data.id}"] .dot-track-artist`);
+    if(tn) tn.textContent = data.track;
+    if(ta) ta.textContent = data.artist;
+  });
+
+  // Счётчик онлайн
+  socket.on('online:count', (count) => {
+    document.getElementById('online-count').textContent = count;
+  });
+
+  // Синхронизация
+  socket.on('sync:start', (data) => {
+    myTrack = data.track;
+    myArtist = data.artist;
+    updatePlayer();
+  });
+}
+
+let myLat = 55.751244;
+let myLng = 37.618423;
+
+function lngToX(lng){ return ((lng - 37.5) / 0.5) * 50 + 25; }
+function latToY(lat){ return ((55.85 - lat) / 0.3) * 50 + 15; }
+
+function addRealUser(u){
+  const wrap = document.getElementById('dots-wrap');
+  if(document.querySelector(`.user-dot[data-id="${u.id}"]`)) return;
+  const x = u.lng ? lngToX(u.lng) : Math.random()*70+10;
+  const y = u.lat ? latToY(u.lat) : Math.random()*60+10;
+  const fake = {
+    id: u.id, name: u.name,
+    emoji: u.emoji||'🎵',
+    track: u.track||'...',
+    artist: u.artist||'',
+    color: '#7F77DD,#534AB7',
+    x, y,
+    listeners: 0, followers: 0, following: 0
+  };
+  const el = makeDot(fake);
+  wrap.appendChild(el);
 }
 
 function renderDots(){
