@@ -225,14 +225,28 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'Inter',sans-serif;
 
 <div class="sheet" id="sheet-track">
   <div class="sheet-handle"></div>
-  <div class="sheet-title">🎵 Что ты слушаешь?</div>
-  <label class="input-label">Название трека</label>
-  <input class="track-input" id="inp-track" placeholder="Например: Blinding Lights">
-  <label class="input-label">Исполнитель</label>
-  <input class="track-input" id="inp-artist" placeholder="Например: The Weeknd">
+  <div class="sheet-title">🎵 Что слушаем?</div>
+  
+  <label class="input-label">Вставь ссылку YouTube</label>
+  <input class="track-input" id="inp-yt-url" placeholder="https://youtube.com/watch?v=...">
+  
+  <div style="text-align:center;color:var(--muted);font-size:.7rem;margin-bottom:.75rem">— или —</div>
+  
+  <label class="input-label">Поиск по названию</label>
+  <div style="display:flex;gap:.5rem;margin-bottom:.75rem">
+    <input class="track-input" id="inp-search" placeholder="Blinding Lights..." style="margin-bottom:0;flex:1">
+    <button class="modal-btn confirm" style="flex:0 0 auto;padding:.8rem 1rem" onclick="searchYT()">🔍</button>
+  </div>
+  
+  <div id="search-results" style="display:none;margin-bottom:.75rem">
+    <label class="input-label">Результаты</label>
+    <div id="search-list"></div>
+  </div>
+
   <label class="input-label">Или загрузи mp3</label>
   <button class="pop-btn follow" style="width:100%;margin-bottom:.75rem" onclick="document.getElementById('file-input').click()">📁 Выбрать аудиофайл</button>
   <input type="file" id="file-input" accept="*/*" onchange="handleFile(event)">
+  
   <div class="modal-actions">
     <button class="modal-btn cancel" onclick="closeAll()">Отмена</button>
     <button class="modal-btn confirm" onclick="confirmTrack()">Транслировать 🎶</button>
