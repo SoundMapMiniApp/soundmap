@@ -728,7 +728,8 @@ function playYT(videoId){
       ytPlayer.loadVideoById(videoId);
       ytPlayer.playVideo();
     } else {
-      document.getElementById('yt-player').innerHTML = '';ytPlayer = new YT.Player('yt-player', {
+      document.getElementById('yt-player').innerHTML = '';
+      ytPlayer = new YT.Player('yt-player', {
         height: '100%',
         width: '100%',
         videoId: videoId,
