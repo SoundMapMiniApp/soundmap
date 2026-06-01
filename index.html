@@ -536,6 +536,7 @@ function confirmTrack(){
   isSynced=false;syncedUser=null;isPlaying=true;
   if(audioFile){const url=URL.createObjectURL(audioFile);audio.src=url;audio.play().catch(()=>showToast('Нажми ▶ чтобы начать'));}
   closeAll();updatePlayer();updateMeDot();
+  if(window.socket) socket.emit('track:set', {track: myTrack, artist: myArtist});
   document.getElementById('sync-btn').classList.remove('active');
   document.getElementById('sync-btn').textContent='⚡ SYNC';
   document.getElementById('play-btn').textContent='⏸';
