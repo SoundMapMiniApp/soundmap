@@ -475,8 +475,14 @@ function connectSocket(){
 let myLat = 55.751244;
 let myLng = 37.618423;
 
-function lngToX(lng){ return ((lng - 37.5) / 0.5) * 50 + 25; }
-function latToY(lat){ return ((55.85 - lat) / 0.3) * 50 + 15; }
+function lngToX(lng){ 
+  if(!lng || lng === 0) return Math.random()*60+20;
+  return ((lng - 37.5) / 0.5) * 50 + 25; 
+}
+function latToY(lat){ 
+  if(!lat || lat === 0) return Math.random()*60+20;
+  return ((55.85 - lat) / 0.3) * 50 + 15; 
+}
 
 function addRealUser(u){
   const wrap = document.getElementById('dots-wrap');
