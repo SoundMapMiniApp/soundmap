@@ -596,7 +596,15 @@ function syncWithUser(){
     document.getElementById('player-listeners').textContent='👂 '+u.listeners;
     startProgress();
     showToast('🎵 Слушаешь вместе с '+u.name+'!');
-    if(window.socket) socket.emit('webrtc:join', { hostId: u.id });
+    if(window.socket){
+  socket.emit('webrtc:join', { hostId: u.id });
+  // Если хост слушает YouTube
+  const ytUrl = u.track;
+  const videoId = ytUrl ? extractYTid(ytUrl) : null;
+  if(videoId){
+    socket.emit('yt:request_sync', { hostId: u.id });
+  }
+}
   },2200);
 }
 
