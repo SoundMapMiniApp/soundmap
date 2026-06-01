@@ -622,13 +622,31 @@ function togglePlay(){
     cover.classList.add('playing');
     if(audio.src){
       audio.play().catch(()=>{});
-      // Захватываем аудио поток для WebRTC
-      if(!window.audioStream && audio.captureStream){
-        window.audioStream = audio.captureStream();
+      // Пробуем захватить поток разными способами
+      try {
+        if(audio.captureStream){
+          window.audioStream = audio.captureStream();
+          showToast('🎙️ Трансляция активна');
+        } else if(audio.mozCaptureStream){
+          window.audioStream = audio.mozCaptureStream();
+          showToast('🎙️ Трансляция активна');
+        } else {
+          // Fallback — Web Audio API
+          const ctx = new AudioContext();
+          const source = ctx.createMediaElementSource(audio);
+          const dest = ctx.createMediaStreamDestination();
+          source.connect(dest);
+          source.connect(ctx.destination);
+          window.audioStream = dest.stream;
+          showToast('🎙️ Трансляция активна');
+        }
+      } catch(e) {
+        console.log('captureStream error:', e);
+        showToast('⚠️ Трансляция недоступна в этом браузере');
       }
     }
     startProgress();
-  }else{
+  } else {
     cover.classList.remove('playing');
     audio.pause();
     clearInterval(progressInterval);
