@@ -601,14 +601,36 @@ function handleFile(e){
 }
 
 function confirmTrack(){
-  const track=document.getElementById('inp-track').value.trim();
-  const artist=document.getElementById('inp-artist').value.trim();
-  if(!track){showToast('Введи название трека 🎵');return;}
-  myTrack=track;myArtist=artist||'Неизвестно';
-  isSynced=false;syncedUser=null;isPlaying=true;
-  if(audioFile){const url=URL.createObjectURL(audioFile);audio.src=url;audio.play().catch(()=>showToast('Нажми ▶ чтобы начать'));}
-  closeAll();updatePlayer();updateMeDot();
-  if(window.socket) socket.emit('track:set', {track: myTrack, artist: myArtist});
+  const ytUrl = document.getElementById('inp-yt-url').value.trim();
+  const track = document.getElementById('inp-track')?.value?.trim() || '';
+  const artist = document.getElementById('inp-artist')?.value?.trim() || '';
+
+  if(ytUrl){
+    const videoId = extractYTid(ytUrl);
+    if(!videoId){ showToast('Неверная ссылка YouTube'); return; }
+    myTrack = ytUrl;
+    myArtist = 'YouTube';
+    playYT(videoId);
+    broadcastTrack(ytUrl, 'YouTube');
+    closeAll();
+    return;
+  }
+
+  if(!track){ showToast('Введи название или ссылку YouTube 🎵'); return; }
+  myTrack = track;
+  myArtist = artist || 'Неизвестно';
+  isSynced = false; syncedUser = null; isPlaying = true;
+
+  if(audioFile){
+    const url = URL.createObjectURL(audioFile);
+    audio.src = url;
+    audio.play().catch(()=>showToast('Нажми ▶ чтобы начать'));
+  }
+
+  closeAll();
+  updatePlayer();
+  updateMeDot();
+  broadcastTrack(myTrack, myArtist);
   document.getElementById('sync-btn').classList.remove('active');
   document.getElementById('sync-btn').textContent='⚡ SYNC';
   document.getElementById('play-btn').textContent='⏸';
@@ -616,7 +638,125 @@ function confirmTrack(){
   document.getElementById('player-state').textContent='🎵 Ты транслируешь';
   document.getElementById('player-listeners').textContent='';
   startProgress();
-  showToast('Транслируешь: '+track+' 🎶');
+  showToast('Транслируешь: '+myTrack+' 🎶');
+}
+
+function broadcastTrack(track, artist){
+  if(window.socket) socket.emit('track:set', {track, artist});
+}
+
+function extractYTid(url){
+  const m = url.match(/(?:v=|youtu\.be\/|embed\/)([a-zA-Z0-9_-]{11})/);
+  return m ? m[1] : null;
+}
+
+let ytPlayer = null;
+let ytReady = false;
+
+function loadYTapi(){
+  if(window.YT) return;
+  const tag = document.createElement('script');
+  tag.src = 'https://www.youtube.com/iframe_api';
+  document.head.appendChild(tag);
+}
+
+window.onYouTubeIframeAPIReady = function(){
+  ytReady = true;
+}
+
+function playYT(videoId){
+  loadYTapi();
+  document.getElementById('yt-player-wrap').style.display = 'block';
+  
+  const tryPlay = () => {
+    if(!window.YT || !ytReady){
+      setTimeout(tryPlay, 300);
+      return;
+    }
+    if(ytPlayer){
+      ytPlayer.loadVideoById(videoId);
+      ytPlayer.playVideo();
+    } else {
+      ytPlayer = new YT.Player('yt-player', {
+        height: '100%',
+        width: '100%',
+        videoId: videoId,
+        playerVars: {
+          autoplay: 1,
+          playsinline: 1,
+          controls: 1,
+        },
+        events: {
+          onReady: (e) => {
+            e.target.playVideo();
+            isPlaying = true;
+            document.getElementById('play-btn').textContent = '⏸';
+            document.getElementById('player-cover').classList.add('playing');
+            document.getElementById('player-state').textContent = '🎵 Ты транслируешь';
+            // Синхронизируем позицию каждые 3 сек
+            setInterval(() => {
+              if(ytPlayer && window.socket){
+                socket.emit('yt:position', {
+                  position: ytPlayer.getCurrentTime(),
+                  videoId: videoId,
+                });
+              }
+            }, 3000);
+          },
+          onStateChange: (e) => {
+            if(e.data === YT.PlayerState.PLAYING){
+              isPlaying = true;
+              document.getElementById('play-btn').textContent = '⏸';
+            } else {
+              isPlaying = false;
+              document.getElementById('play-btn').textContent = '▶';
+            }
+          }
+        }
+      });
+    }
+    // Обновляем плеер бар
+    myTrack = 'YouTube';
+    updatePlayer();
+    updateMeDot();
+  };
+  tryPlay();
+}
+
+function closeYT(){
+  if(ytPlayer) ytPlayer.pauseVideo();
+  document.getElementById('yt-player-wrap').style.display = 'none';
+}
+
+function searchYT(){
+  const q = document.getElementById('inp-search').value.trim();
+  if(!q){ showToast('Введи название'); return; }
+  showToast('🔍 Ищем...');
+  
+  // Используем YouTube oEmbed для поиска
+  fetch(`https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`)
+    .then(() => {
+      // Прямой поиск без API key через noembed
+      const results = [
+        { title: q + ' (найди на YouTube)', videoId: null }
+      ];
+      showSearchResults(results, q);
+    }).catch(() => {
+      showToast('Вставь ссылку YouTube напрямую 🔗');
+    });
+}
+
+function showSearchResults(results, query){
+  const list = document.getElementById('search-list');
+  document.getElementById('search-results').style.display = 'block';
+  list.innerHTML = `
+    <div style="font-size:.72rem;color:var(--muted);line-height:1.6;padding:.5rem 0">
+      YouTube Search API требует ключ. Пока что:<br>
+      1. Найди трек на <b style="color:var(--accent2)">youtube.com</b><br>
+      2. Скопируй ссылку<br>
+      3. Вставь в поле выше 👆
+    </div>
+  `;
 }
 
 function updatePlayer(){
