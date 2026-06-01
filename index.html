@@ -232,7 +232,7 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'Inter',sans-serif;
   <input class="track-input" id="inp-artist" placeholder="Например: The Weeknd">
   <label class="input-label">Или загрузи mp3</label>
   <button class="pop-btn follow" style="width:100%;margin-bottom:.75rem" onclick="document.getElementById('file-input').click()">📁 Выбрать аудиофайл</button>
-  <input type="file" id="file-input" accept="audio/*" onchange="handleFile(event)">
+  <input type="file" id="file-input" accept="*/*" onchange="handleFile(event)">
   <div class="modal-actions">
     <button class="modal-btn cancel" onclick="closeAll()">Отмена</button>
     <button class="modal-btn confirm" onclick="confirmTrack()">Транслировать 🎶</button>
