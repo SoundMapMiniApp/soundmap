@@ -289,6 +289,10 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'Inter',sans-serif;
 
 <div class="toast" id="toast"></div>
 <audio id="audio-player"></audio>
+<div id="yt-player-wrap" style="position:fixed;bottom:140px;left:0;right:0;z-index:99;display:none;background:#000;aspect-ratio:16/9;max-height:220px;">
+  <div id="yt-player"></div>
+  <button onclick="closeYT()" style="position:absolute;top:6px;right:8px;background:rgba(0,0,0,0.7);border:none;color:#fff;font-size:1.2rem;cursor:pointer;border-radius:50%;width:28px;height:28px;">✕</button>
+</div>
 
 <script>
 const SERVER_URL = 'https://soundmap-server-production.up.railway.app';const tg=window.Telegram?.WebApp;
