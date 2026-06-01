@@ -345,7 +345,7 @@ function connectSocket(){
   window.socket = io(SERVER_URL);
 
   socket.on('connect', () => {
-    console.log('✅ Подключён к серверу');
+    console.log('✅ Подключён');
     socket.emit('user:join', {
       name: MY_NAME,
       emoji: '🎵',
@@ -368,10 +368,6 @@ function connectSocket(){
   socket.on('user:offline', (data) => {
     const el = document.querySelector(`.user-dot[data-id="${data.id}"]`);
     if(el) el.remove();
-    if(peerConnections[data.id]){
-      peerConnections[data.id].close();
-      delete peerConnections[data.id];
-    }
   });
 
   socket.on('user:moved', (data) => {
@@ -393,55 +389,38 @@ function connectSocket(){
     document.getElementById('online-count').textContent = count;
   });
 
-  // ══════════════════════════════
-  // WebRTC — ХОСТ (тот кто транслирует)
-  // ══════════════════════════════
-
-  // К нам подключился слушатель — создаём соединение
+  // WebRTC — ХОСТ
   socket.on('webrtc:listener_joined', async ({ listenerId }) => {
     if(!window.audioStream) return;
-
-    const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+    const pc = new RTCPeerConnection({
+      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+    });
     peerConnections[listenerId] = pc;
-
-    // Добавляем наш аудио поток
     window.audioStream.getTracks().forEach(track => {
       pc.addTrack(track, window.audioStream);
     });
-
     pc.onicecandidate = (e) => {
-      if(e.candidate){
-        socket.emit('webrtc:ice', { to: listenerId, candidate: e.candidate });
-      }
+      if(e.candidate) socket.emit('webrtc:ice', { to: listenerId, candidate: e.candidate });
     };
-
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
     socket.emit('webrtc:offer', { to: listenerId, offer });
   });
 
-  // Слушатель ответил
   socket.on('webrtc:answer', async ({ from, answer }) => {
     const pc = peerConnections[from];
     if(pc) await pc.setRemoteDescription(answer);
   });
 
-  // ══════════════════════════════
   // WebRTC — СЛУШАТЕЛЬ
-  // ══════════════════════════════
-
-  // Хост прислал offer
   socket.on('webrtc:offer', async ({ from, offer }) => {
-    const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+    const pc = new RTCPeerConnection({
+      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+    });
     peerConnections[from] = pc;
-
     pc.onicecandidate = (e) => {
-      if(e.candidate){
-        socket.emit('webrtc:ice', { to: from, candidate: e.candidate });
-      }
+      if(e.candidate) socket.emit('webrtc:ice', { to: from, candidate: e.candidate });
     };
-
-    // Получаем аудио поток от хоста
     pc.ontrack = (e) => {
       const remoteAudio = new Audio();
       remoteAudio.srcObject = e.streams[0];
@@ -449,20 +428,17 @@ function connectSocket(){
       window.remoteAudio = remoteAudio;
       showToast('🎵 Синхронизация установлена!');
     };
-
     await pc.setRemoteDescription(offer);
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
     socket.emit('webrtc:answer', { to: from, answer });
   });
 
-  // ICE candidates
   socket.on('webrtc:ice', async ({ from, candidate }) => {
     const pc = peerConnections[from];
     if(pc) await pc.addIceCandidate(candidate);
   });
 
-  // Хост отключился
   socket.on('webrtc:host_left', () => {
     if(window.remoteAudio){
       window.remoteAudio.pause();
