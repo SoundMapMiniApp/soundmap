@@ -635,22 +635,20 @@ function togglePlay(){
   isPlaying=!isPlaying;
   document.getElementById('play-btn').textContent=isPlaying?'⏸':'▶';
   const cover=document.getElementById('player-cover');
-  if(isPlaying){cover.classList.add('playing');if(audio.src)audio.play().catch(()=>{});startProgress();}
-  else{cover.classList.remove('playing');audio.pause();clearInterval(progressInterval);}
-}
-
-function startProgress(){
-  clearInterval(progressInterval);
-  if(audioFile&&audio.src){
-    progressInterval=setInterval(()=>{
-      if(audio.duration){progressPct=(audio.currentTime/audio.duration)*100;document.getElementById('progress-fill').style.width=progressPct+'%';}
-    },500);
+  if(isPlaying){
+    cover.classList.add('playing');
+    if(audio.src){
+      audio.play().catch(()=>{});
+      // Захватываем аудио поток для WebRTC
+      if(!window.audioStream && audio.captureStream){
+        window.audioStream = audio.captureStream();
+      }
+    }
+    startProgress();
   }else{
-    progressInterval=setInterval(()=>{
-      progressPct=Math.min(progressPct+0.25,100);
-      if(progressPct>=100)progressPct=0;
-      document.getElementById('progress-fill').style.width=progressPct+'%';
-    },1000);
+    cover.classList.remove('playing');
+    audio.pause();
+    clearInterval(progressInterval);
   }
 }
 
