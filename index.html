@@ -55,6 +55,9 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'Inter',sans-serif;
 .eq-bars span{width:2px;border-radius:1px;animation:eq .8s ease-in-out infinite alternate}
 @keyframes eq{from{transform:scaleY(.25);opacity:.5}to{transform:scaleY(1);opacity:1}}
 .user-dot.is-me .dot-avatar{border-color:#fff;box-shadow:0 0 0 3px rgba(244,114,182,.35),0 4px 20px rgba(0,0,0,.4)}
+.yt-wrap{position:fixed;bottom:140px;left:0;right:0;z-index:99;display:none;background:#000;aspect-ratio:16/9;max-height:220px}
+.yt-wrap iframe{width:100%;height:100%;border:none}
+.yt-close{position:absolute;top:6px;right:8px;background:rgba(0,0,0,.7);border:none;color:#fff;font-size:1.2rem;cursor:pointer;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;z-index:2}
 .player-bar{position:relative;z-index:100;background:rgba(13,13,26,.97);backdrop-filter:blur(20px);border-top:1px solid var(--border);padding:.7rem 1rem .8rem;flex-shrink:0}
 .player-state{font-size:.58rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent2);font-weight:600;margin-bottom:.5rem}
 .player-row{display:flex;align-items:center;gap:.75rem;margin-bottom:.6rem}
@@ -145,14 +148,16 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'Inter',sans-serif;
   </div>
   <div class="splash-name">SoundMap</div>
   <div class="splash-tag">Your soul on the map</div>
-  <button class="btn-start" onclick="startApp()"><span>🎵</span> Начать слушать</button>
+  <button class="btn-start" id="btn-start">
+    <span>🎵</span> Начать слушать
+  </button>
   <p class="splash-hint">Нажимая кнопку, ты разрешаешь доступ к геолокации</p>
 </div>
 
 <div class="screen hidden" id="screen-app">
   <div class="topbar">
     <div class="topbar-logo">SoundMap</div>
-    <div class="online-badge"><div class="live-dot"></div><span id="online-count">247</span> онлайн</div>
+    <div class="online-badge"><div class="live-dot"></div><span id="online-count">0</span> онлайн</div>
     <div class="my-avatar" id="my-avatar" onclick="openSetTrack()">🎵</div>
   </div>
   <div class="map-container" id="map">
@@ -167,6 +172,13 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'Inter',sans-serif;
     <div class="map-label" style="left:68%;top:72%">Набережная</div>
     <div id="dots-wrap"></div>
   </div>
+
+  <!-- YouTube плеер -->
+  <div class="yt-wrap" id="yt-wrap">
+    <iframe id="yt-iframe" allowfullscreen allow="autoplay"></iframe>
+    <button class="yt-close" onclick="closeYT()">✕</button>
+  </div>
+
   <div class="player-bar">
     <div class="player-state" id="player-state">🎵 Выбери трек</div>
     <div class="player-row">
@@ -226,27 +238,15 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'Inter',sans-serif;
 <div class="sheet" id="sheet-track">
   <div class="sheet-handle"></div>
   <div class="sheet-title">🎵 Что слушаем?</div>
-  
   <label class="input-label">Вставь ссылку YouTube</label>
   <input class="track-input" id="inp-yt-url" placeholder="https://youtube.com/watch?v=...">
-  
-  <div style="text-align:center;color:var(--muted);font-size:.7rem;margin-bottom:.75rem">— или —</div>
-  
-  <label class="input-label">Поиск по названию</label>
-  <div style="display:flex;gap:.5rem;margin-bottom:.75rem">
-    <input class="track-input" id="inp-search" placeholder="Blinding Lights..." style="margin-bottom:0;flex:1">
-    <button class="modal-btn confirm" style="flex:0 0 auto;padding:.8rem 1rem" onclick="searchYT()">🔍</button>
-  </div>
-  
-  <div id="search-results" style="display:none;margin-bottom:.75rem">
-    <label class="input-label">Результаты</label>
-    <div id="search-list"></div>
-  </div>
-
+  <label class="input-label">Название трека</label>
+  <input class="track-input" id="inp-track" placeholder="Например: Blinding Lights">
+  <label class="input-label">Исполнитель</label>
+  <input class="track-input" id="inp-artist" placeholder="Например: The Weeknd">
   <label class="input-label">Или загрузи mp3</label>
   <button class="pop-btn follow" style="width:100%;margin-bottom:.75rem" onclick="document.getElementById('file-input').click()">📁 Выбрать аудиофайл</button>
   <input type="file" id="file-input" accept="*/*" onchange="handleFile(event)">
-  
   <div class="modal-actions">
     <button class="modal-btn cancel" onclick="closeAll()">Отмена</button>
     <button class="modal-btn confirm" onclick="confirmTrack()">Транслировать 🎶</button>
@@ -303,553 +303,393 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'Inter',sans-serif;
 
 <div class="toast" id="toast"></div>
 <audio id="audio-player"></audio>
-<div id="yt-player-wrap" style="position:fixed;bottom:140px;left:0;right:0;z-index:99;display:none;background:#000;aspect-ratio:16/9;max-height:220px;">
-  <div id="yt-player"></div>
-  <button onclick="closeYT()" style="position:absolute;top:6px;right:8px;background:rgba(0,0,0,0.7);border:none;color:#fff;font-size:1.2rem;cursor:pointer;border-radius:50%;width:28px;height:28px;">✕</button>
-</div>
 
 <script>
-const SERVER_URL = 'https://soundmap-server-production.up.railway.app';const tg=window.Telegram?.WebApp;
-if(tg){tg.ready();tg.expand();}
-const TG_USER=tg?.initDataUnsafe?.user||{};
-const MY_NAME=TG_USER.first_name||'Ты';
-const USERS=[
-  {id:1,name:'Алексей',emoji:'😎',track:'Blinding Lights',artist:'The Weeknd',color:'#7c3aed,#4f46e5',x:22,y:30,listeners:8,followers:142,following:89},
-  {id:2,name:'Катя',emoji:'🎧',track:'Flowers',artist:'Miley Cyrus',color:'#ec4899,#f472b6',x:60,y:24,listeners:23,followers:891,following:204},
-  {id:3,name:'Дима',emoji:'🤙',track:'As It Was',artist:'Harry Styles',color:'#1D9E75,#0f6e56',x:74,y:52,listeners:5,followers:67,following:120},
-  {id:4,name:'Соня',emoji:'🌸',track:'Kill Bill',artist:'SZA',color:'#f59e0b,#d97706',x:36,y:70,listeners:31,followers:2100,following:302},
-  {id:5,name:'Макс',emoji:'🔥',track:'Quevedo',artist:'Bizarrap',color:'#ef4444,#dc2626',x:14,y:68,listeners:12,followers:445,following:156},
-  {id:6,name:'Лера',emoji:'💫',track:'Unholy',artist:'Sam Smith',color:'#8b5cf6,#6d28d9',x:84,y:36,listeners:19,followers:733,following:281},
-];
-let myTrack=null,myArtist=null,isPlaying=false,isSynced=false,syncedUser=null,currentUser=null;
-let progressPct=0,progressInterval=null,selectedStars=10,selectedStarsMe=100,audioFile=null;
-const audio=document.getElementById('audio-player');
+// ══════════════════════════════
+// INIT
+// ══════════════════════════════
+const tg = window.Telegram && window.Telegram.WebApp;
+if(tg){ tg.ready(); tg.expand(); }
+const TG_USER = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) || {};
+const MY_NAME = TG_USER.first_name || 'Слушатель';
+const SERVER_URL = 'https://soundmap-server-production.up.railway.app';
 
-function startApp(){
+// STATE
+let myTrack = null, myArtist = null;
+let isPlaying = false, isSynced = false, syncedUser = null;
+let currentUser = null;
+let progressPct = 0, progressInterval = null;
+let selectedStars = 10, selectedStarsMe = 100;
+let audioFile = null;
+let myLat = 55.751244, myLng = 37.618423;
+let ytVideoId = null, ytPosition = 0, ytSyncInterval = null;
+const peerConnections = {};
+const audio = document.getElementById('audio-player');
+
+// ══════════════════════════════
+// START — вешаем обработчик на кнопку
+// ══════════════════════════════
+document.getElementById('btn-start').addEventListener('click', function() {
   document.getElementById('screen-splash').classList.add('hidden');
   document.getElementById('screen-app').classList.remove('hidden');
-  document.getElementById('my-avatar').textContent='🎵';
+  document.getElementById('my-avatar').textContent = '🎵';
   animateOnline();
 
-  // Подключаемся к серверу
-  const script = document.createElement('script');
-  script.src = 'https://cdn.socket.io/4.6.1/socket.io.min.js';
-  script.onload = () => connectSocket();
-  document.head.appendChild(script);
-
-  // Запрашиваем геолокацию
+  // Геолокация
   if(navigator.geolocation){
-    navigator.geolocation.getCurrentPosition(pos => {
+    navigator.geolocation.getCurrentPosition(function(pos){
       myLat = pos.coords.latitude;
       myLng = pos.coords.longitude;
       renderDots();
-    }, () => {
-      myLat = 55.751244;
-      myLng = 37.618423;
+    }, function(){
       renderDots();
     });
   } else {
-    myLat = 55.751244;
-    myLng = 37.618423;
     renderDots();
   }
 
-  showToast('Привет, '+MY_NAME+'! 👋');
+  // Загружаем Socket.io и подключаемся
+  var script = document.createElement('script');
+  script.src = 'https://cdn.socket.io/4.6.1/socket.io.min.js';
+  script.onload = function(){ connectSocket(); };
+  document.head.appendChild(script);
+
+  showToast('Привет, ' + MY_NAME + '! 👋');
+});
+
+// ══════════════════════════════
+// DOTS
+// ══════════════════════════════
+function renderDots(){
+  var w = document.getElementById('dots-wrap');
+  w.innerHTML = '';
+  // ME dot
+  var me = document.createElement('div');
+  me.className = 'user-dot is-me';
+  me.id = 'me-dot';
+  me.style.left = '50%';
+  me.style.top = '50%';
+  me.innerHTML = '<div class="dot-rings"><div class="dot-ring" style="border-color:rgba(244,114,182,.7)"></div><div class="dot-ring r2" style="border-color:rgba(244,114,182,.4)"></div><div class="dot-ring r3" style="border-color:rgba(244,114,182,.2)"></div><div class="dot-avatar" style="background:linear-gradient(135deg,#f472b6,#7c3aed)">🎵</div></div><div class="dot-track-card" id="me-card" style="display:none"><div class="dot-track-name" id="me-tn"></div><div class="dot-track-artist" id="me-ta"></div><div class="eq-bars"><span style="background:#f472b6;height:4px"></span><span style="background:#f472b6;height:7px;animation-delay:.1s"></span><span style="background:#f472b6;height:5px;animation-delay:.2s"></span><span style="background:#f472b6;height:8px;animation-delay:.15s"></span><span style="background:#f472b6;height:3px;animation-delay:.05s"></span></div></div>';
+  me.onclick = function(){ openSetTrack(); };
+  w.appendChild(me);
+  setInterval(function(){
+    var el = document.getElementById('me-dot');
+    if(el && window.socket){
+      window.socket.emit('location:update', { lat: myLat, lng: myLng });
+    }
+  }, 5000);
 }
 
-const peerConnections = {};
+function makeDot(u){
+  var c = u.color ? u.color.split(',')[0] : '#7F77DD';
+  var el = document.createElement('div');
+  el.className = 'user-dot';
+  el.dataset.id = u.id;
+  el.style.left = (u.x || lngToX(u.lng)) + '%';
+  el.style.top = (u.y || latToY(u.lat)) + '%';
+  el.innerHTML = '<div class="dot-rings"><div class="dot-ring" style="border-color:' + c + '99"></div><div class="dot-ring r2" style="border-color:' + c + '55"></div><div class="dot-ring r3" style="border-color:' + c + '22"></div><div class="dot-avatar" style="background:linear-gradient(135deg,' + (u.color || '#7F77DD,#534AB7') + ')">' + (u.emoji || '🎵') + '</div></div><div class="dot-track-card"><div class="dot-track-name">' + (u.track || '...') + '</div><div class="dot-track-artist">' + (u.artist || '') + '</div><div class="eq-bars"><span style="background:' + c + ';height:4px"></span><span style="background:' + c + ';height:7px;animation-delay:.12s"></span><span style="background:' + c + ';height:5px;animation-delay:.22s"></span><span style="background:' + c + ';height:8px;animation-delay:.17s"></span><span style="background:' + c + ';height:3px;animation-delay:.07s"></span></div></div>';
+  el.onclick = function(){ openUserPopup(u); };
+  return el;
+}
 
+function addRealUser(u){
+  var wrap = document.getElementById('dots-wrap');
+  if(document.querySelector('.user-dot[data-id="' + u.id + '"]')) return;
+  var x = u.lng ? lngToX(u.lng) : (Math.random()*60+20);
+  var y = u.lat ? latToY(u.lat) : (Math.random()*60+20);
+  u.x = x; u.y = y;
+  u.color = '#7F77DD,#534AB7';
+  var el = makeDot(u);
+  wrap.appendChild(el);
+}
+
+function lngToX(lng){
+  if(!lng || lng === 0) return Math.random()*60+20;
+  return ((lng - 37.5) / 0.5) * 50 + 25;
+}
+function latToY(lat){
+  if(!lat || lat === 0) return Math.random()*60+20;
+  return ((55.85 - lat) / 0.3) * 50 + 15;
+}
+
+// ══════════════════════════════
+// SOCKET
+// ══════════════════════════════
 function connectSocket(){
   window.socket = io(SERVER_URL);
 
-  socket.on('connect', () => {
-    console.log('✅ Подключён');
-    socket.emit('user:join', {
-      name: MY_NAME,
-      emoji: '🎵',
-      lat: myLat,
-      lng: myLng,
-    });
+  socket.on('connect', function(){
+    socket.emit('user:join', { name: MY_NAME, emoji: '🎵', lat: myLat, lng: myLng });
   });
 
-  socket.on('users:all', (data) => {
-    data.forEach(u => {
+  socket.on('users:all', function(data){
+    data.forEach(function(u){
       if(u.id !== socket.id) addRealUser(u);
     });
   });
 
-  socket.on('user:joined', (u) => {
+  socket.on('user:joined', function(u){
     addRealUser(u);
-    showToast('🎵 '+u.name+' на карте');
+    showToast('🎵 ' + u.name + ' на карте');
   });
 
-  socket.on('user:offline', (data) => {
-    const el = document.querySelector(`.user-dot[data-id="${data.id}"]`);
+  socket.on('user:offline', function(data){
+    var el = document.querySelector('.user-dot[data-id="' + data.id + '"]');
     if(el) el.remove();
   });
 
-  socket.on('user:moved', (data) => {
-    const el = document.querySelector(`.user-dot[data-id="${data.id}"]`);
+  socket.on('user:moved', function(data){
+    var el = document.querySelector('.user-dot[data-id="' + data.id + '"]');
     if(el){
-      el.style.left = lngToX(data.lng)+'%';
-      el.style.top  = latToY(data.lat)+'%';
+      el.style.left = lngToX(data.lng) + '%';
+      el.style.top = latToY(data.lat) + '%';
     }
   });
 
-  socket.on('user:track', (data) => {
-    const tn = document.querySelector(`.user-dot[data-id="${data.id}"] .dot-track-name`);
-    const ta = document.querySelector(`.user-dot[data-id="${data.id}"] .dot-track-artist`);
+  socket.on('user:track', function(data){
+    var tn = document.querySelector('.user-dot[data-id="' + data.id + '"] .dot-track-name');
+    var ta = document.querySelector('.user-dot[data-id="' + data.id + '"] .dot-track-artist');
     if(tn) tn.textContent = data.track;
     if(ta) ta.textContent = data.artist;
   });
 
-  socket.on('online:count', (count) => {
-    socket.on('yt:request_sync', ({ from }) => {
-    if(ytPlayer && ytPlayer.getCurrentTime){
+  socket.on('online:count', function(count){
+    document.getElementById('online-count').textContent = count;
+  });
+
+  // YouTube sync
+  socket.on('yt:request_sync', function(data){
+    if(ytVideoId){
       socket.emit('yt:sync_response', {
-        to: from,
-        videoId: ytPlayer.getVideoData().video_id,
-        position: ytPlayer.getCurrentTime(),
+        to: data.from,
+        videoId: ytVideoId,
+        position: ytPosition,
       });
     }
   });
 
-  socket.on('yt:sync_response', ({ videoId, position }) => {
-    playYT(videoId);
-    setTimeout(() => {
-      if(ytPlayer) ytPlayer.seekTo(position, true);
-    }, 2000);
-    showToast('▶️ Синхронизируемся с YouTube!');
-  });
-    document.getElementById('online-count').textContent = count;
+  socket.on('yt:sync_response', function(data){
+    playYT(data.videoId, data.position);
+    showToast('▶️ Синхронизируемся!');
   });
 
-  // WebRTC — ХОСТ
-  socket.on('webrtc:listener_joined', async ({ listenerId }) => {
-    if(!window.audioStream) return;
-    const pc = new RTCPeerConnection({
-      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-    });
-    peerConnections[listenerId] = pc;
-    window.audioStream.getTracks().forEach(track => {
-      pc.addTrack(track, window.audioStream);
-    });
-    pc.onicecandidate = (e) => {
-      if(e.candidate) socket.emit('webrtc:ice', { to: listenerId, candidate: e.candidate });
-    };
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-    socket.emit('webrtc:offer', { to: listenerId, offer });
-  });
-
-  socket.on('webrtc:answer', async ({ from, answer }) => {
-    const pc = peerConnections[from];
-    if(pc) await pc.setRemoteDescription(answer);
-  });
-
-  // WebRTC — СЛУШАТЕЛЬ
-  socket.on('webrtc:offer', async ({ from, offer }) => {
-    const pc = new RTCPeerConnection({
-      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-    });
-    peerConnections[from] = pc;
-    pc.onicecandidate = (e) => {
-      if(e.candidate) socket.emit('webrtc:ice', { to: from, candidate: e.candidate });
-    };
-    pc.ontrack = (e) => {
-      const remoteAudio = new Audio();
-      remoteAudio.srcObject = e.streams[0];
-      remoteAudio.play().catch(()=>{});
-      window.remoteAudio = remoteAudio;
-      showToast('🎵 Синхронизация установлена!');
-    };
-    await pc.setRemoteDescription(offer);
-    const answer = await pc.createAnswer();
-    await pc.setLocalDescription(answer);
-    socket.emit('webrtc:answer', { to: from, answer });
-  });
-
-  socket.on('webrtc:ice', async ({ from, candidate }) => {
-    const pc = peerConnections[from];
-    if(pc) await pc.addIceCandidate(candidate);
-  });
-
-  // YouTube синхронизация
-  socket.on('yt:position', ({ position, videoId }) => {
-    if(!ytPlayer){
-      playYT(videoId);
-      setTimeout(() => {
-        if(ytPlayer && ytPlayer.seekTo){
-          ytPlayer.seekTo(position, true);
-        }
-      }, 2000);
-    } else {
-      const current = ytPlayer.getCurrentTime();
-      if(Math.abs(current - position) > 3){
-        ytPlayer.seekTo(position, true);
-      }
+  socket.on('yt:position', function(data){
+    if(!ytVideoId){
+      playYT(data.videoId, data.position);
     }
   });
-
-  socket.on('yt:sync', ({ videoId, position }) => {
-    playYT(videoId);
-    setTimeout(() => {
-      if(ytPlayer && ytPlayer.seekTo){
-        ytPlayer.seekTo(position, true);
-        ytPlayer.playVideo();
-      }
-    }, 2000);
-    showToast('▶️ Синхронизация YouTube!');
-  });socket.on('webrtc:host_left', () => {
-    if(window.remoteAudio){
-      window.remoteAudio.pause();
-      window.remoteAudio = null;
-    }
-    showToast('Хост отключился');
-  });
 }
 
-let myLat = 55.751244;
-let myLng = 37.618423;
-
-function lngToX(lng){ 
-  if(!lng || lng === 0) return Math.random()*60+20;
-  return ((lng - 37.5) / 0.5) * 50 + 25; 
-}
-function latToY(lat){ 
-  if(!lat || lat === 0) return Math.random()*60+20;
-  return ((55.85 - lat) / 0.3) * 50 + 15; 
-}
-
-function addRealUser(u){
-  const wrap = document.getElementById('dots-wrap');
-  if(document.querySelector(`.user-dot[data-id="${u.id}"]`)) return;
-  const x = u.lng ? lngToX(u.lng) : Math.random()*70+10;
-  const y = u.lat ? latToY(u.lat) : Math.random()*60+10;
-  const fake = {
-    id: u.id, name: u.name,
-    emoji: u.emoji||'🎵',
-    track: u.track||'...',
-    artist: u.artist||'',
-    color: '#7F77DD,#534AB7',
-    x, y,
-    listeners: 0, followers: 0, following: 0
-  };
-  const el = makeDot(fake);
-  wrap.appendChild(el);
-}
-
-function renderDots(){
-  const w=document.getElementById('dots-wrap');
-  w.innerHTML='';
-  USERS.forEach(u=>w.appendChild(makeDot(u)));
-  const me=document.createElement('div');
-  me.className='user-dot is-me';me.id='me-dot';
-  me.style.left='50%';me.style.top='50%';
-  me.innerHTML=`<div class="dot-rings"><div class="dot-ring" style="border-color:rgba(244,114,182,.7)"></div><div class="dot-ring r2" style="border-color:rgba(244,114,182,.4)"></div><div class="dot-ring r3" style="border-color:rgba(244,114,182,.2)"></div><div class="dot-avatar" style="background:linear-gradient(135deg,#f472b6,#7c3aed)">🎵</div></div><div class="dot-track-card" id="me-card" style="display:none"><div class="dot-track-name" id="me-tn"></div><div class="dot-track-artist" id="me-ta"></div><div class="eq-bars"><span style="background:#f472b6;height:4px"></span><span style="background:#f472b6;height:7px;animation-delay:.1s"></span><span style="background:#f472b6;height:5px;animation-delay:.2s"></span><span style="background:#f472b6;height:8px;animation-delay:.15s"></span><span style="background:#f472b6;height:3px;animation-delay:.05s"></span></div></div>`;
-  me.onclick=()=>openSetTrack();
-  w.appendChild(me);
-  setInterval(moveDots,4500);
-}
-
-function makeDot(u){
-  const c=u.color.split(',')[0];
-  const el=document.createElement('div');
-  el.className='user-dot';el.dataset.id=u.id;
-  el.style.left=u.x+'%';el.style.top=u.y+'%';
-  el.innerHTML=`<div class="dot-rings"><div class="dot-ring" style="border-color:${c}99"></div><div class="dot-ring r2" style="border-color:${c}55"></div><div class="dot-ring r3" style="border-color:${c}22"></div><div class="dot-avatar" style="background:linear-gradient(135deg,${u.color})">${u.emoji}${u.listeners>10?`<div class="dot-listeners">👂${u.listeners}</div>`:''}</div></div><div class="dot-track-card"><div class="dot-track-name">${u.track}</div><div class="dot-track-artist">${u.artist}</div><div class="eq-bars"><span style="background:${c};height:4px"></span><span style="background:${c};height:7px;animation-delay:.12s"></span><span style="background:${c};height:5px;animation-delay:.22s"></span><span style="background:${c};height:8px;animation-delay:.17s"></span><span style="background:${c};height:3px;animation-delay:.07s"></span></div></div>`;
-  el.onclick=()=>openUserPopup(u);
-  return el;
-}
-
-function moveDots(){
-  USERS.forEach(u=>{
-    u.x=Math.max(6,Math.min(88,u.x+(Math.random()-.5)*4));
-    u.y=Math.max(8,Math.min(82,u.y+(Math.random()-.5)*4));
-    const el=document.querySelector(`.user-dot[data-id="${u.id}"]`);
-    if(el){el.style.left=u.x+'%';el.style.top=u.y+'%';}
-  });
-}
-
+// ══════════════════════════════
+// USER POPUP
+// ══════════════════════════════
 function openUserPopup(u){
-  currentUser=u;
-  document.getElementById('pu-avatar').textContent=u.emoji;
-  document.getElementById('pu-avatar').style.background=`linear-gradient(135deg,${u.color})`;
-  document.getElementById('pu-name').textContent=u.name;
-  document.getElementById('pu-followers').textContent=u.followers.toLocaleString();
-  document.getElementById('pu-following').textContent=u.following;
-  document.getElementById('pu-track').textContent=u.track;
-  document.getElementById('pu-artist').textContent=u.artist;
-  document.getElementById('pu-listeners').textContent=u.listeners;
-  document.getElementById('pu-cover').style.background=`linear-gradient(135deg,${u.color})`;
-  document.getElementById('pu-cover').textContent='🎵';
-  const fb=document.getElementById('pu-follow-btn');
-  fb.classList.remove('on');fb.textContent='+ Подписаться';
+  currentUser = u;
+  document.getElementById('pu-avatar').textContent = u.emoji || '🎵';
+  document.getElementById('pu-avatar').style.background = 'linear-gradient(135deg,' + (u.color || '#7F77DD,#534AB7') + ')';
+  document.getElementById('pu-name').textContent = u.name;
+  document.getElementById('pu-followers').textContent = (u.followers || 0).toLocaleString();
+  document.getElementById('pu-following').textContent = u.following || 0;
+  document.getElementById('pu-track').textContent = u.track || '...';
+  document.getElementById('pu-artist').textContent = u.artist || '';
+  document.getElementById('pu-listeners').textContent = u.listeners || 0;
+  document.getElementById('pu-cover').style.background = 'linear-gradient(135deg,' + (u.color || '#7F77DD,#534AB7') + ')';
+  document.getElementById('pu-cover').textContent = '🎵';
+  var fb = document.getElementById('pu-follow-btn');
+  fb.classList.remove('on'); fb.textContent = '+ Подписаться';
   openSheet('sheet-user');
 }
 
 function toggleFollow(btn){
-  if(btn.classList.contains('on')){btn.classList.remove('on');btn.textContent='+ Подписаться';showToast('Отписались');}
-  else{btn.classList.add('on');btn.textContent='✓ Подписан';showToast('Подписались на '+currentUser?.name+' 🌟');}
-}
-
-function syncWithUser(){
-  if(!currentUser)return;
-  const u=currentUser;closeAll();
-  const ov=document.getElementById('sync-overlay');
-  document.getElementById('sync-icon').textContent=u.emoji;
-  document.getElementById('sync-title').textContent='Синхронизация с '+u.name;
-  document.getElementById('sync-sub').textContent=u.track+' — '+u.artist;
-  ov.classList.add('show');
-  setTimeout(()=>{
-    ov.classList.remove('show');
-    syncedUser=u;isSynced=true;myTrack=u.track;myArtist=u.artist;isPlaying=true;
-    updatePlayer();
-    document.getElementById('sync-btn').classList.add('active');
-    document.getElementById('sync-btn').textContent='⚡ SYNCED';
-    document.getElementById('play-btn').textContent='⏸';
-    document.getElementById('player-cover').classList.add('playing');
-    document.getElementById('player-state').textContent='⚡ Слушаешь с '+u.name;
-    document.getElementById('player-listeners').textContent='👂 '+u.listeners;
-    startProgress();
-    showToast('🎵 Слушаешь вместе с '+u.name+'!');
-    if(window.socket){
-  socket.emit('webrtc:join', { hostId: u.id });
-  // Если хост слушает YouTube
-  const ytUrl = u.track;
-  const videoId = ytUrl ? extractYTid(ytUrl) : null;
-  if(videoId){
-    socket.emit('yt:request_sync', { hostId: u.id });
+  if(btn.classList.contains('on')){
+    btn.classList.remove('on'); btn.textContent = '+ Подписаться';
+    showToast('Отписались');
+  } else {
+    btn.classList.add('on'); btn.textContent = '✓ Подписан';
+    showToast('Подписались на ' + (currentUser && currentUser.name) + ' 🌟');
   }
 }
-  },2200);
+
+// ══════════════════════════════
+// SYNC
+// ══════════════════════════════
+function syncWithUser(){
+  if(!currentUser) return;
+  var u = currentUser;
+  closeAll();
+  var ov = document.getElementById('sync-overlay');
+  document.getElementById('sync-icon').textContent = u.emoji || '🎵';
+  document.getElementById('sync-title').textContent = 'Синхронизация с ' + u.name;
+  document.getElementById('sync-sub').textContent = (u.track || '...') + ' — ' + (u.artist || '');
+  ov.classList.add('show');
+  setTimeout(function(){
+    ov.classList.remove('show');
+    syncedUser = u; isSynced = true;
+    myTrack = u.track; myArtist = u.artist; isPlaying = true;
+    updatePlayer();
+    document.getElementById('sync-btn').classList.add('active');
+    document.getElementById('sync-btn').textContent = '⚡ SYNCED';
+    document.getElementById('play-btn').textContent = '⏸';
+    document.getElementById('player-cover').classList.add('playing');
+    document.getElementById('player-state').textContent = '⚡ Слушаешь с ' + u.name;
+    document.getElementById('player-listeners').textContent = '👂 ' + (u.listeners || 0);
+    startProgress();
+    showToast('🎵 Слушаешь вместе с ' + u.name + '!');
+    // Запрашиваем YouTube синхронизацию
+    if(window.socket){
+      socket.emit('user:join', { name: MY_NAME, emoji: '🎵', lat: myLat, lng: myLng });
+      socket.emit('yt:request_sync', { hostId: u.id });
+    }
+  }, 2200);
 }
 
 function toggleSync(){
   if(isSynced){
-    isSynced=false;syncedUser=null;
+    isSynced = false; syncedUser = null;
     document.getElementById('sync-btn').classList.remove('active');
-    document.getElementById('sync-btn').textContent='⚡ SYNC';
-    document.getElementById('player-state').textContent=myTrack?'🎵 Ты транслируешь':'🎵 Выбери трек';
-    document.getElementById('player-listeners').textContent='';
+    document.getElementById('sync-btn').textContent = '⚡ SYNC';
+    document.getElementById('player-state').textContent = myTrack ? '🎵 Ты транслируешь' : '🎵 Выбери трек';
+    document.getElementById('player-listeners').textContent = '';
     showToast('Синхронизация отключена');
-    if(audio.src)audio.play().catch(()=>{});
-  }else showToast('Нажми на пользователя на карте 👆');
+  } else {
+    showToast('Нажми на пользователя на карте 👆');
+  }
 }
 
+// ══════════════════════════════
+// SET TRACK
+// ══════════════════════════════
 function openSetTrack(){
-  if(myTrack){document.getElementById('inp-track').value=myTrack;document.getElementById('inp-artist').value=myArtist||'';}
+  document.getElementById('inp-yt-url').value = '';
+  document.getElementById('inp-track').value = myTrack || '';
+  document.getElementById('inp-artist').value = myArtist || '';
   openSheet('sheet-track');
 }
 
 function handleFile(e){
-  const f=e.target.files[0];if(!f)return;
-  audioFile=f;
-  const name=f.name.replace(/\.[^/.]+$/,'').replace(/_/g,' ');
-  document.getElementById('inp-track').value=name;
-  document.getElementById('inp-artist').value='';
-  showToast('📁 '+f.name);
+  var f = e.target.files[0];
+  if(!f) return;
+  var isAudio = f.type.startsWith('audio/') || f.name.match(/\.(mp3|m4a|ogg|wav|flac|aac|opus)$/i);
+  if(!isAudio){ showToast('Выбери аудио файл 🎵'); return; }
+  audioFile = f;
+  var name = f.name.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ');
+  document.getElementById('inp-track').value = name;
+  document.getElementById('inp-artist').value = '';
+  showToast('📁 ' + f.name);
 }
 
 function confirmTrack(){
-  const ytUrl = document.getElementById('inp-yt-url').value.trim();
-  const track = document.getElementById('inp-track')?.value?.trim() || '';
-  const artist = document.getElementById('inp-artist')?.value?.trim() || '';
+  var ytUrl = document.getElementById('inp-yt-url').value.trim();
+  var track = document.getElementById('inp-track').value.trim();
+  var artist = document.getElementById('inp-artist').value.trim();
 
   if(ytUrl){
-    const videoId = extractYTid(ytUrl);
+    var videoId = extractYTid(ytUrl);
     if(!videoId){ showToast('Неверная ссылка YouTube'); return; }
-    myTrack = ytUrl;
-    myArtist = 'YouTube';
-    playYT(videoId);
-    broadcastTrack(ytUrl, 'YouTube');
+    myTrack = track || 'YouTube';
+    myArtist = artist || 'YouTube';
     closeAll();
+    playYT(videoId, 0);
+    if(window.socket) socket.emit('track:set', { track: myTrack, artist: myArtist });
+    updateMeDot();
     return;
   }
 
-  if(!track){ showToast('Введи название или ссылку YouTube 🎵'); return; }
-  myTrack = track;
+  if(!track && !audioFile){ showToast('Введи название или ссылку YouTube 🎵'); return; }
+  myTrack = track || (audioFile ? audioFile.name : '');
   myArtist = artist || 'Неизвестно';
   isSynced = false; syncedUser = null; isPlaying = true;
 
   if(audioFile){
-    const url = URL.createObjectURL(audioFile);
+    var url = URL.createObjectURL(audioFile);
     audio.src = url;
-    audio.play().catch(()=>showToast('Нажми ▶ чтобы начать'));
+    audio.play().catch(function(){ showToast('Нажми ▶ чтобы начать'); });
   }
 
   closeAll();
   updatePlayer();
   updateMeDot();
-  broadcastTrack(myTrack, myArtist);
+  if(window.socket) socket.emit('track:set', { track: myTrack, artist: myArtist });
   document.getElementById('sync-btn').classList.remove('active');
-  document.getElementById('sync-btn').textContent='⚡ SYNC';
-  document.getElementById('play-btn').textContent='⏸';
+  document.getElementById('sync-btn').textContent = '⚡ SYNC';
+  document.getElementById('play-btn').textContent = '⏸';
   document.getElementById('player-cover').classList.add('playing');
-  document.getElementById('player-state').textContent='🎵 Ты транслируешь';
-  document.getElementById('player-listeners').textContent='';
+  document.getElementById('player-state').textContent = '🎵 Ты транслируешь';
+  document.getElementById('player-listeners').textContent = '';
   startProgress();
-  showToast('Транслируешь: '+myTrack+' 🎶');
+  showToast('Транслируешь: ' + myTrack + ' 🎶');
 }
 
-function broadcastTrack(track, artist){
-  if(window.socket) socket.emit('track:set', {track, artist});
+function updatePlayer(){
+  document.getElementById('player-track').textContent = myTrack || 'Нажми чтобы выбрать';
+  document.getElementById('player-artist').textContent = myArtist || 'твой трек виден всем на карте';
+  if(!audioFile) progressPct = Math.random()*50+10;
+  document.getElementById('progress-fill').style.width = progressPct + '%';
 }
 
+function updateMeDot(){
+  var card = document.getElementById('me-card');
+  if(myTrack){
+    card.style.display = 'block';
+    document.getElementById('me-tn').textContent = myTrack;
+    document.getElementById('me-ta').textContent = myArtist;
+  }
+}
+
+// ══════════════════════════════
+// YOUTUBE
+// ══════════════════════════════
 function extractYTid(url){
-  const m = url.match(/(?:v=|youtu\.be\/|embed\/)([a-zA-Z0-9_-]{11})/);
+  var m = url.match(/(?:v=|youtu\.be\/|embed\/)([a-zA-Z0-9_-]{11})/);
   return m ? m[1] : null;
 }
 
-let ytPlayer = null;
-let ytReady = false;
+function playYT(videoId, startPosition){
+  ytVideoId = videoId;
+  ytPosition = startPosition || 0;
+  var wrap = document.getElementById('yt-wrap');
+  var iframe = document.getElementById('yt-iframe');
+  wrap.style.display = 'block';
+  var src = 'https://www.youtube-nocookie.com/embed/' + videoId + '?autoplay=1&playsinline=1&start=' + Math.floor(ytPosition);
+  iframe.src = src;
 
-function loadYTapi(){
-  if(window.YT) return;
-  const tag = document.createElement('script');
-  tag.src = 'https://www.youtube.com/iframe_api';
-  document.head.appendChild(tag);
-}
-
-window.onYouTubeIframeAPIReady = function(){
-  ytReady = true;
-}
-
-function playYT(videoId){
-  document.getElementById('yt-player-wrap').style.display = 'block';
-  document.getElementById('yt-player').innerHTML = `
-    <iframe 
-      src="https://invidious.io/embed/${videoId}?autoplay=1&loop=0" 
-      width="100%" 
-      height="100%" 
-      frameborder="0" 
-      allow="autoplay; fullscreen"
-      allowfullscreen>
-    </iframe>
-  `;
-  myTrack = 'https://youtube.com/watch?v=' + videoId;
-  myArtist = 'YouTube';
+  myTrack = myTrack || 'YouTube';
+  myArtist = myArtist || 'YouTube';
   isPlaying = true;
   document.getElementById('play-btn').textContent = '⏸';
   document.getElementById('player-cover').classList.add('playing');
   document.getElementById('player-state').textContent = '🎵 Ты транслируешь';
   updatePlayer();
   updateMeDot();
-  broadcastTrack(myTrack, 'YouTube');
-  showToast('▶️ Играет!');
 
-  // Синхронизируем позицию каждые 3 сек
-  clearInterval(window.ytSyncInterval);
-  window.ytSyncInterval = setInterval(() => {
+  // Синхронизируем позицию
+  clearInterval(ytSyncInterval);
+  ytSyncInterval = setInterval(function(){
+    ytPosition += 3;
     if(window.socket){
-      socket.emit('yt:position', {
-        videoId,
-        position: window.ytPosition || 0,
-      });
-      window.ytPosition = (window.ytPosition || 0) + 3;
+      socket.emit('yt:position', { videoId: videoId, position: ytPosition });
     }
   }, 3000);
 }
-          onStateChange: (e) => {
-            if(e.data === YT.PlayerState.PLAYING){
-              isPlaying = true;
-              document.getElementById('play-btn').textContent = '⏸';
-            } else {
-              isPlaying = false;
-              document.getElementById('play-btn').textContent = '▶';
-            }
-          }
-        }
-      });
-    }
-    // Обновляем плеер бар
-    myTrack = 'YouTube';
-    updatePlayer();
-    updateMeDot();
-  };
-  tryPlay();
-}
 
 function closeYT(){
-  if(ytPlayer) ytPlayer.pauseVideo();
-  document.getElementById('yt-player-wrap').style.display = 'none';
+  document.getElementById('yt-wrap').style.display = 'none';
+  document.getElementById('yt-iframe').src = '';
+  ytVideoId = null;
+  clearInterval(ytSyncInterval);
 }
 
-function searchYT(){
-  const q = document.getElementById('inp-search').value.trim();
-  if(!q){ showToast('Введи название'); return; }
-  showToast('🔍 Ищем...');
-  
-  // Используем YouTube oEmbed для поиска
-  fetch(`https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`)
-    .then(() => {
-      // Прямой поиск без API key через noembed
-      const results = [
-        { title: q + ' (найди на YouTube)', videoId: null }
-      ];
-      showSearchResults(results, q);
-    }).catch(() => {
-      showToast('Вставь ссылку YouTube напрямую 🔗');
-    });
-}
-
-function showSearchResults(results, query){
-  const list = document.getElementById('search-list');
-  document.getElementById('search-results').style.display = 'block';
-  list.innerHTML = `
-    <div style="font-size:.72rem;color:var(--muted);line-height:1.6;padding:.5rem 0">
-      YouTube Search API требует ключ. Пока что:<br>
-      1. Найди трек на <b style="color:var(--accent2)">youtube.com</b><br>
-      2. Скопируй ссылку<br>
-      3. Вставь в поле выше 👆
-    </div>
-  `;
-}
-
-function updatePlayer(){
-  document.getElementById('player-track').textContent=myTrack||'Нажми чтобы выбрать';
-  document.getElementById('player-artist').textContent=myArtist||'твой трек виден всем на карте';
-  progressPct=audioFile?0:Math.random()*50+10;
-  document.getElementById('progress-fill').style.width=progressPct+'%';
-}
-
-function updateMeDot(){
-  const card=document.getElementById('me-card');
-  if(myTrack){card.style.display='block';document.getElementById('me-tn').textContent=myTrack;document.getElementById('me-ta').textContent=myArtist;}
-}
-
+// ══════════════════════════════
+// PLAYER
+// ══════════════════════════════
 function togglePlay(){
-  if(!myTrack){openSetTrack();return;}
-  isPlaying=!isPlaying;
-  document.getElementById('play-btn').textContent=isPlaying?'⏸':'▶';
-  const cover=document.getElementById('player-cover');
+  if(!myTrack){ openSetTrack(); return; }
+  isPlaying = !isPlaying;
+  document.getElementById('play-btn').textContent = isPlaying ? '⏸' : '▶';
+  var cover = document.getElementById('player-cover');
   if(isPlaying){
     cover.classList.add('playing');
-    if(audio.src){
-      audio.play().catch(()=>{});
-      // Пробуем захватить поток разными способами
-      try {
-        if(audio.captureStream){
-          window.audioStream = audio.captureStream();
-          showToast('🎙️ Трансляция активна');
-        } else if(audio.mozCaptureStream){
-          window.audioStream = audio.mozCaptureStream();
-          showToast('🎙️ Трансляция активна');
-        } else {
-          // Fallback — Web Audio API
-          const ctx = new AudioContext();
-          const source = ctx.createMediaElementSource(audio);
-          const dest = ctx.createMediaStreamDestination();
-          source.connect(dest);
-          source.connect(ctx.destination);
-          window.audioStream = dest.stream;
-          showToast('🎙️ Трансляция активна');
-        }
-      } catch(e) {
-        console.log('captureStream error:', e);
-        showToast('⚠️ Трансляция недоступна в этом браузере');
-      }
-    }
+    if(audio.src) audio.play().catch(function(){});
     startProgress();
   } else {
     cover.classList.remove('playing');
@@ -858,76 +698,104 @@ function togglePlay(){
   }
 }
 
-function seekTrack(e,bar){
-  const rect=bar.getBoundingClientRect();
-  const pct=((e.clientX-rect.left)/rect.width)*100;
-  progressPct=pct;
-  document.getElementById('progress-fill').style.width=pct+'%';
-  if(audio.duration)audio.currentTime=(pct/100)*audio.duration;
+function startProgress(){
+  clearInterval(progressInterval);
+  if(audioFile && audio.src){
+    progressInterval = setInterval(function(){
+      if(audio.duration){
+        progressPct = (audio.currentTime / audio.duration) * 100;
+        document.getElementById('progress-fill').style.width = progressPct + '%';
+      }
+    }, 500);
+  } else {
+    progressInterval = setInterval(function(){
+      progressPct = Math.min(progressPct + 0.25, 100);
+      if(progressPct >= 100) progressPct = 0;
+      document.getElementById('progress-fill').style.width = progressPct + '%';
+    }, 1000);
+  }
 }
 
-function skipBack(){if(audio.src)audio.currentTime=Math.max(0,audio.currentTime-10);showToast('⏮ -10 сек');}
-function skipForward(){if(audio.src)audio.currentTime=Math.min(audio.duration||0,audio.currentTime+10);showToast('⏭ +10 сек');}
+function seekTrack(e, bar){
+  var rect = bar.getBoundingClientRect();
+  var pct = ((e.clientX - rect.left) / rect.width) * 100;
+  progressPct = pct;
+  document.getElementById('progress-fill').style.width = pct + '%';
+  if(audio.duration) audio.currentTime = (pct / 100) * audio.duration;
+}
 
+function skipBack(){ if(audio.src) audio.currentTime = Math.max(0, audio.currentTime - 10); showToast('⏮ -10 сек'); }
+function skipForward(){ if(audio.src) audio.currentTime = Math.min(audio.duration || 0, audio.currentTime + 10); showToast('⏭ +10 сек'); }
+
+// ══════════════════════════════
+// DONATE
+// ══════════════════════════════
 function openDonateUser(){
-  closeAll();selectedStars=10;
-  document.querySelectorAll('#stars-grid-user .star-opt').forEach(el=>el.classList.remove('selected'));
-  document.getElementById('donate-total-user').textContent='11 ⭐';
+  closeAll();
+  selectedStars = 10;
+  document.querySelectorAll('#stars-grid-user .star-opt').forEach(function(el){ el.classList.remove('selected'); });
+  document.getElementById('donate-total-user').textContent = '11 ⭐';
   openSheet('sheet-donate-user');
 }
 
-function selectStars(el,amount){
-  selectedStars=amount;
-  document.querySelectorAll('#stars-grid-user .star-opt').forEach(e=>e.classList.remove('selected'));
+function selectStars(el, amount){
+  selectedStars = amount;
+  document.querySelectorAll('#stars-grid-user .star-opt').forEach(function(e){ e.classList.remove('selected'); });
   el.classList.add('selected');
-  document.getElementById('donate-total-user').textContent=(amount+1)+' ⭐';
+  document.getElementById('donate-total-user').textContent = (amount + 1) + ' ⭐';
 }
 
-function selectStarsMe(el,amount){
-  selectedStarsMe=amount;
-  document.querySelectorAll('#sheet-donate-me .star-opt').forEach(e=>e.classList.remove('selected'));
+function selectStarsMe(el, amount){
+  selectedStarsMe = amount;
+  document.querySelectorAll('#sheet-donate-me .star-opt').forEach(function(e){ e.classList.remove('selected'); });
   el.classList.add('selected');
 }
 
 function sendDonate(type){
-  const amount=type==='user'?selectedStars:selectedStarsMe;
+  var amount = type === 'user' ? selectedStars : selectedStarsMe;
   closeAll();
-  if(type==='user'&&currentUser)showToast('⭐ Отправил '+amount+' звёзд для '+currentUser.name+'!');
-  else showToast('💙 Спасибо за поддержку! '+amount+' ⭐');
+  if(type === 'user' && currentUser) showToast('⭐ Отправил ' + amount + ' звёзд для ' + currentUser.name + '!');
+  else showToast('💙 Спасибо за поддержку! ' + amount + ' ⭐');
 }
 
-function navTo(btn,tab){
-  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+// ══════════════════════════════
+// NAV / SHEETS
+// ══════════════════════════════
+function navTo(btn, tab){
+  document.querySelectorAll('.nav-btn').forEach(function(b){ b.classList.remove('active'); });
   btn.classList.add('active');
-  if(tab==='donate-me')openSheet('sheet-donate-me');
-  else if(tab==='profile')showToast('Профиль — скоро 🔧');
+  if(tab === 'donate-me') openSheet('sheet-donate-me');
+  else if(tab === 'profile') showToast('Профиль — скоро 🔧');
   else closeAll();
 }
 
-function openSheet(id){document.getElementById('backdrop').classList.add('show');document.getElementById(id).classList.add('open');}
+function openSheet(id){
+  document.getElementById('backdrop').classList.add('show');
+  document.getElementById(id).classList.add('open');
+}
+
 function closeAll(){
   document.getElementById('backdrop').classList.remove('show');
-  document.querySelectorAll('.sheet').forEach(s=>s.classList.remove('open'));
-  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.sheet').forEach(function(s){ s.classList.remove('open'); });
+  document.querySelectorAll('.nav-btn').forEach(function(b){ b.classList.remove('active'); });
   document.querySelector('.nav-btn').classList.add('active');
 }
 
 function animateOnline(){
-  setInterval(()=>{
-    const el=document.getElementById('online-count');
-    el.textContent=Math.max(200,parseInt(el.textContent)+Math.floor(Math.random()*5)-2);
-  },3000);
+  setInterval(function(){
+    var el = document.getElementById('online-count');
+    var n = parseInt(el.textContent) || 0;
+    if(n < 5) return;
+    el.textContent = Math.max(1, n + Math.floor(Math.random()*3) - 1);
+  }, 3000);
 }
 
 function showToast(msg){
-  const t=document.getElementById('toast');
-  t.textContent=msg;t.classList.add('show');
-  setTimeout(()=>t.classList.remove('show'),2500);
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(function(){ t.classList.remove('show'); }, 2500);
 }
-
-document.querySelectorAll('.track-input').forEach(inp=>{
-  inp.addEventListener('keydown',e=>{if(e.key==='Enter')confirmTrack();});
-});
 </script>
 </body>
 </html>
