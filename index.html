@@ -404,6 +404,23 @@ function connectSocket(){
   });
 
   socket.on('online:count', (count) => {
+    socket.on('yt:request_sync', ({ from }) => {
+    if(ytPlayer && ytPlayer.getCurrentTime){
+      socket.emit('yt:sync_response', {
+        to: from,
+        videoId: ytPlayer.getVideoData().video_id,
+        position: ytPlayer.getCurrentTime(),
+      });
+    }
+  });
+
+  socket.on('yt:sync_response', ({ videoId, position }) => {
+    playYT(videoId);
+    setTimeout(() => {
+      if(ytPlayer) ytPlayer.seekTo(position, true);
+    }, 2000);
+    showToast('▶️ Синхронизируемся с YouTube!');
+  });
     document.getElementById('online-count').textContent = count;
   });
 
